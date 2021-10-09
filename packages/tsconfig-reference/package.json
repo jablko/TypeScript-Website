@@ -23,6 +23,8 @@
     "semi": true
   },
   "devDependencies": {
+    "mdast-util-from-markdown": "^1.1.0",
+    "mdast-util-frontmatter": "^1.0.0",
     "remark": "^11.0.2",
     "remark-html": "^10.0.0",
     "ts-node": "*",

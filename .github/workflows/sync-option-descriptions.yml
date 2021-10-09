@@ -1,0 +1,81 @@
+name: Sync option descriptions -> compiler
+on:
+  # When our dependencies change
+  pull_request:
+    paths:
+      - "**/package.json"
+      - .github/workflows/sync-option-descriptions.yml
+      - packages/tsconfig-reference/scripts/sync-option-descriptions.ts
+      - packages/tsconfig-reference/tsconfig.json
+  push:
+    paths:
+      - "**/package.json"
+      - .github/workflows/sync-option-descriptions.yml
+      - packages/tsconfig-reference/scripts/sync-option-descriptions.ts
+      - packages/tsconfig-reference/tsconfig.json
+  schedule:
+    # https://crontab.guru/#0_0_*_*_0
+    - cron: 0 0 * * 0
+  workflow_dispatch:
+jobs:
+  sync-option-descriptions:
+    #if: github.repository == 'microsoft/TypeScript-Website'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2
+        with:
+          repository: microsoft/TypeScript
+          token: ${{ secrets.PAT }} #${{ secrets.GITHUB_BOT_TOKEN }}
+          path: TypeScript
+      - run: git switch --create sync-option-descriptions
+        working-directory: TypeScript
+      - uses: actions/setup-node@v2
+        with:
+          cache: yarn
+      - run: yarn install
+      - run: tsc --build packages/tsconfig-reference
+      - name: Update option descriptions in the compiler
+        run: node packages/tsconfig-reference/scripts/sync-option-descriptions
+      - run: git config user.name "$GITHUB_REPOSITORY:.github/workflows/sync-option-descriptions.yml"
+        working-directory: TypeScript
+      - run: git config user.email bot@typescriptlang.org
+        working-directory: TypeScript
+      - run: |
+          git diff --quiet ||
+          git commit --all \
+            --message "🤖 Sync option descriptions <- $GITHUB_REPOSITORY@$GITHUB_SHA" \
+            --message "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+        working-directory: TypeScript
+      - name: Sync compiler fork
+        run: gh repo sync --force jablko/TypeScript
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT }}
+      - run: git remote set-url origin https://github.com/jablko/TypeScript.git
+        working-directory: TypeScript
+      - name: Push if anything changed
+        run: |
+          # Get the first three existing commits: Existing sync commit,
+          # parent and baselines commit, possibly. Ignore the first line
+          # of git cherry output: The current tip of main. Might be
+          # equivalent (-) or not (+) due to shallow cloning.
+          git fetch --depth 3 origin sync-option-descriptions &&
+          ! git cherry origin/sync-option-descriptions | tail --lines 1 | grep --invert-match --quiet ^- ||
+          git push --force-with-lease origin sync-option-descriptions
+        working-directory: TypeScript
+      - name: Update baselines
+        run: gh workflow run --ref sync-option-descriptions accept-baselines-fix-lints.yaml
+        working-directory: TypeScript
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT }} #${{ secrets.GITHUB_BOT_TOKEN }}
+      - name: Submit pull request
+        run: |
+          gh pr create \
+            --repo microsoft/TypeScript \
+            --title '🤖 Sync option descriptions <- website' \
+            --body 'Get command-line option descriptions from the website Markdown and update their corresponding descriptions in the compiler.
+
+            /cc @orta' || true
+        working-directory: TypeScript
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT }} #${{ secrets.GITHUB_BOT_TOKEN }}
