@@ -14,9 +14,19 @@ import { writeFileSync } from "fs";
 import { join } from "path";
 import { format } from "prettier";
 import { CompilerOptionName } from "../../data/_types";
+import { deprecated } from "../tsconfigRules.js";
 
 // @ts-ignore - this isn't public
 import { libs } from "typescript";
+
+declare global {
+  interface Array<T> {
+    includes<U>(
+      searchElement: U,
+      fromIndex?: number
+    ): searchElement is Extract<T, U>;
+  }
+}
 
 const toJSONString = (obj) => format(JSON.stringify(obj, null, "  "), { filepath: "thing.json" });
 const writeJSON = (name, obj) => writeFileSync(join(__dirname, "result", name), toJSONString(obj));
@@ -151,6 +161,7 @@ Object.keys(schemaCompilerOpts).forEach((flag) => {
       host[i] = { enum: existingList.concat(newKeys) };
     }
   }
+  if (deprecated.includes(flag)) schemaCompilerOpts[flag].deprecated = true;
 });
 
 writeJSON("schema.json", schemaBase);
