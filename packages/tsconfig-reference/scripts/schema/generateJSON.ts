@@ -14,9 +14,12 @@ import { writeFileSync } from "fs";
 import { join } from "path";
 import { format } from "prettier";
 import { CompilerOptionName } from "../../data/_types";
+import ts from "typescript";
+import type { CommandLineOption } from "../tsconfigRules.js";
 
-// @ts-ignore - this isn't public
-import { libs } from "typescript";
+declare module "typescript" {
+  const libs: string[];
+}
 
 const toJSONString = (obj) => format(JSON.stringify(obj, null, "  "), { filepath: "thing.json" });
 const writeJSON = (name, obj) => writeFileSync(join(__dirname, "result", name), toJSONString(obj));
@@ -138,8 +141,8 @@ Object.keys(schemaCompilerOpts).forEach((flag) => {
   if (host) {
     const existingList = "enum" in host ? host.enum : host.find((e) => e.enum).enum;
     const compilerInfo = tsconfigOpts.find((opt) => opt.name === flag);
-    const realType = (compilerInfo.type as any) as Record<string, number>;
-    const keys = flag === "lib" ? libs : Object.keys(realType);
+    const realType = compilerInfo.type as any as Record<string, number>;
+    const keys = flag === "lib" ? ts.libs : Object.keys(realType);
     const newKeys = keys.filter(
       (k) => !existingList.find((f) => f.toLowerCase() === k.toLowerCase())
     );
@@ -151,6 +154,30 @@ Object.keys(schemaCompilerOpts).forEach((flag) => {
       host[i] = { enum: existingList.concat(newKeys) };
     }
   }
+  const option = ts.optionDeclarations.find((option) => option.name === flag);
+  if (option)
+    schemaCompilerOpts[flag].default =
+      typeof option.defaultValueDescription === "object"
+        ? undefined
+        : getDefault(
+            option.defaultValueDescription === "undefined"
+              ? undefined
+              : ["number", "boolean"].includes(option.type as never)
+              ? JSON.parse(option.defaultValueDescription as never)
+              : option.defaultValueDescription,
+            option.type === "list" ? option.element.type : option.type
+          );
 });
+
+function getDefault(
+  defaultValue: CommandLineOption["defaultValueDescription"],
+  type: CommandLineOption["type"]
+) {
+  return defaultValue;
+  if (defaultValue === undefined || typeof type !== "object")
+    return defaultValue;
+  const [name] = [...type].find(([, value]) => value === defaultValue)!;
+  return name;
+}
 
 writeJSON("schema.json", schemaBase);

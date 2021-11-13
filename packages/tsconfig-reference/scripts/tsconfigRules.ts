@@ -3,7 +3,7 @@ import * as remark from "remark";
 import * as remarkHTML from "remark-html";
 import * as ts from "typescript";
 
-interface CommandLineOption {
+export interface CommandLineOption {
   name: string;
   type:
     | "string"
