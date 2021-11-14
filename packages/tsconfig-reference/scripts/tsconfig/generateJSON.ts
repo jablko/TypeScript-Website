@@ -15,7 +15,6 @@ import { writeFileSync } from "fs";
 import { join } from "path";
 import { format } from "prettier";
 import {
-  denyList,
   relatedTo,
   deprecated,
   internal,
@@ -60,9 +59,9 @@ const options = [
 const categories = new Set<ts.DiagnosticMessage>();
 
 // Cut down the list
-const filteredOptions = options
-  .filter((o) => !denyList.includes(o.name as CompilerOptionName))
-  .filter((o) => !o.isCommandLineOnly);
+const filteredOptions = options.filter(
+  (o) => o.category?.key !== "Command_line_Options_6171"
+);
 
 // The import from TS isn't 'clean'
 const buildOpts = ["build", "verbose", "dry", "clean", "force"];

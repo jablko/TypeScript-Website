@@ -27,21 +27,6 @@ declare module "typescript" {
  * https://github.com/SchemaStore/schemastore/blob/master/src/schemas/json/jsconfig.json
  */
 
-/** Options which should never show on the references, basically anything that's for the CLI not the TSConfig */
-export const denyList: CompilerOptionName[] = [
-  "help",
-  "init",
-  "all",
-  "watch",
-  "version",
-  "build",
-  "project",
-  "locale",
-  "clean",
-  "dry",
-  "enableAutoDiscovery",
-];
-
 /** Things we should document, but really want to help move people away from */
 export const deprecated: CompilerOptionName[] = [
   "out",
