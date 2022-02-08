@@ -137,7 +137,7 @@ function getDescription(optionName: string) {
   return toString(descriptionTree);
 }
 
-function toString(node: Partial<unist.Parent>): string {
+function toString(node: Partial<unist.Parent & unist.Literal>): string {
   return node.type === "inlineCode"
     ? `'${node.value}'`
     : (node.value as string) ||

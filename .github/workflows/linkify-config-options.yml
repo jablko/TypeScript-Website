@@ -1,0 +1,85 @@
+name: Linkify config options
+on:
+  # When our dependencies change
+  pull_request:
+    paths:
+      - "**/package.json"
+      - .github/workflows/linkify-config-options.yml
+      - packages/tsconfig-reference/scripts/linkify-config-options.ts
+      - packages/tsconfig-reference/tsconfig.json
+  push:
+    paths:
+      - "**/package.json"
+      - .github/workflows/linkify-config-options.yml
+      - packages/tsconfig-reference/scripts/linkify-config-options.ts
+      - packages/tsconfig-reference/tsconfig.json
+  schedule:
+    # https://crontab.guru/#0_0_*_*_0
+    - cron: 0 0 * * 0
+  workflow_dispatch:
+jobs:
+  linkify-config-options:
+    #if: github.repository == 'microsoft/TypeScript-Website'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2
+        with:
+          repository: DefinitelyTyped/DefinitelyTyped
+          #token: ${{ secrets.GITHUB_BOT_TOKEN }}
+          token: ${{ secrets.PAT }}
+          path: DefinitelyTyped
+      - run: git switch --create linkify-config-options
+        working-directory: DefinitelyTyped
+      - uses: actions/setup-node@v2
+        with:
+          cache: yarn
+      - run: yarn install
+      - run: tsc --build packages/tsconfig-reference
+      - run: git config user.name "$GITHUB_REPOSITORY:.github/workflows/linkify-config-options.yml"
+        working-directory: DefinitelyTyped
+      - run: git config user.email bot@typescriptlang.org
+        working-directory: DefinitelyTyped
+      - run: yarn remark --output --no-config --no-ignore DefinitelyTyped
+      - run: yarn prettier --ignore-path /dev/null --no-config --write 'DefinitelyTyped/**/*.md'
+      - run: |
+          git diff --quiet ||
+          git commit --all --message 'Collateral diffs'
+        working-directory: DefinitelyTyped
+      - run: yarn remark --output --use tsconfig-reference/scripts/linkify-config-options.js --no-config --no-ignore DefinitelyTyped
+      - run: yarn prettier --ignore-path /dev/null --no-config --write 'DefinitelyTyped/**/*.md'
+      - run: |
+          git diff --quiet ||
+          git commit --all \
+            --message '[README] 🤖 Linkify config options' \
+            --message "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+        working-directory: DefinitelyTyped
+      - name: Subtract collateral diffs
+        run: git rebase --onto '@^{/Collateral diffs}^' --strategy-option theirs '@^{/Collateral diffs}'
+        working-directory: DefinitelyTyped
+      - name: Sync target fork
+        run: gh repo sync --force jablko/DefinitelyTyped
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT }}
+      - run: git remote set-url origin https://github.com/jablko/DefinitelyTyped.git
+        working-directory: DefinitelyTyped
+      - name: Push if anything changed
+        run: |
+          # Get the first two existing commits: Existing commit and
+          # parent, possibly. Ignore the first line of git cherry
+          # output: The current tip of main. Might be equivalent (-) or
+          # not (+) due to shallow cloning.
+          git fetch --depth 2 origin linkify-config-options &&
+          ! git cherry origin/linkify-config-options | tail --lines 1 | grep --invert-match --quiet ^- ||
+          git push --force-with-lease origin linkify-config-options
+        working-directory: DefinitelyTyped
+      - name: Submit pull request
+        run: |
+          gh pr create \
+            --repo DefinitelyTyped/DefinitelyTyped \
+            --title '[README] 🤖 Linkify config options' \
+            --body 'Get command-line option descriptions from the website Markdown and update their corresponding descriptions in the compiler.' --draft || true
+        working-directory: DefinitelyTyped
+        env:
+          #GITHUB_TOKEN: ${{ secrets.GITHUB_BOT_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PAT }}
