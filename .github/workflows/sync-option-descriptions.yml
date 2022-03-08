@@ -35,17 +35,27 @@ jobs:
           cache: yarn
       - run: yarn install
       - run: tsc --build packages/tsconfig-reference
-      - name: Update option descriptions in the compiler
-        run: node packages/tsconfig-reference/scripts/sync-option-descriptions
       - run: git config user.name "$GITHUB_REPOSITORY:.github/workflows/sync-option-descriptions.yml"
         working-directory: TypeScript
       - run: git config user.email bot@typescriptlang.org
         working-directory: TypeScript
+      - run: cp TypeScript/src/compiler/diagnosticMessages.json .
+      - run: jq --indent 4 . diagnosticMessages.json > TypeScript/src/compiler/diagnosticMessages.json
+      - run: vim '+argdo set fileformat=dos | write' +quit TypeScript/src/compiler/diagnosticMessages.json
+      - run: |
+          git diff --quiet ||
+          git commit --all --message 'Collateral diffs'
+        working-directory: TypeScript
+      - name: Update option descriptions in the compiler
+        run: node packages/tsconfig-reference/scripts/sync-option-descriptions
       - run: |
           git diff --quiet ||
           git commit --all \
             --message "🤖 Sync option descriptions <- $GITHUB_REPOSITORY@$GITHUB_SHA" \
             --message "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+        working-directory: TypeScript
+      - name: Subtract collateral diffs
+        run: git rebase --onto '@^{/Collateral diffs}^' --strategy-option theirs '@^{/Collateral diffs}'
         working-directory: TypeScript
       - name: Sync compiler fork
         run: gh repo sync --force jablko/TypeScript
@@ -75,7 +85,7 @@ jobs:
             --title '🤖 Sync option descriptions <- website' \
             --body 'Get command-line option descriptions from the website Markdown and update their corresponding descriptions in the compiler.
 
-            /cc @orta' || true
+            /cc @gabritto' || true
         working-directory: TypeScript
         env:
           GITHUB_TOKEN: ${{ secrets.PAT }} #${{ secrets.GITHUB_BOT_TOKEN }}
